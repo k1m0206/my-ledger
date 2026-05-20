@@ -1,0 +1,5 @@
+{
+  "name": "My Ledger",
+  "description": "A personal accounting application with a desktop-adapted mobile interface and internal API.",
+  "requestFramePermissions": []
+}
