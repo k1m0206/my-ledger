@@ -37,8 +37,14 @@
 | amount | number | 是 | - | 金额（元） |
 | type | string | 是 | - | 类型：income（收入）/ expense（支出） |
 | category | string | 是 | - | 分类名称 |
-| date | string | 否 | 当前时间 | 日期时间，ISO 8601格式 |
+| date | string | 否 | 当前时间 | 日期时间，ISO 8601格式；如传入必须包含日期和时间，禁止只传 `YYYY-MM-DD` |
 | note | string | 否 | null | 备注信息 |
+
+**时间字段规则：**
+- 新增或批量新增账目时，如果 AI 传 `date` 字段，必须传完整日期时间，例如 `2026-05-20T12:30:00`。
+- 禁止只传日期，例如不要传 `2026-05-20`，否则会丢失真实记录时间。
+- 如果用户只提供日期（如“昨天”“5月20日”）但没有提供具体时间，应使用当前时间的时分秒补齐该日期。
+- 如果用户没有提供日期或时间，可以不传 `date` 字段，让系统使用当前日期时间。
 
 #### 查询参数
 
@@ -81,7 +87,7 @@
 1. 使用正则提取金额：\d+\.?\d*
 2. 提取关键词进行分类匹配
 3. 判断收入/支出类型
-4. 组装记账参数
+4. 组装记账参数；如包含 date，必须是完整日期时间 `YYYY-MM-DDTHH:mm:ss`
 5. 调用记账API
 ```
 
@@ -116,9 +122,9 @@
 ```json
 POST /api/ledger/batch
 [
-  {"amount": 10, "type": "expense", "category": "餐饮", "note": "早餐"},
-  {"amount": 20, "type": "expense", "category": "餐饮", "note": "午餐"},
-  {"amount": 50, "type": "income", "category": "红包", "note": "收到红包"}
+  {"amount": 10, "type": "expense", "category": "餐饮", "date": "2026-05-20T08:10:00", "note": "早餐"},
+  {"amount": 20, "type": "expense", "category": "餐饮", "date": "2026-05-20T12:20:00", "note": "午餐"},
+  {"amount": 50, "type": "income", "category": "红包", "date": "2026-05-20T19:30:00", "note": "收到红包"}
 ]
 ```
 
@@ -325,7 +331,7 @@ Content-Type: application/json
 ```bash
 curl -X POST http://localhost:8000/api/ledger/ \
   -H "Content-Type: application/json" \
-  -d '{"amount": 25.5, "type": "expense", "category": "餐饮", "note": "午餐"}'
+  -d '{"amount": 25.5, "type": "expense", "category": "餐饮", "date": "2026-05-20T12:00:00", "note": "午餐"}'
 ```
 
 ### 4.2 批量导入
@@ -340,9 +346,9 @@ Content-Type: application/json
 **请求体：**
 ```json
 [
-  {"amount": 10, "type": "expense", "category": "餐饮", "note": "早餐"},
-  {"amount": 20, "type": "expense", "category": "餐饮", "note": "午餐"},
-  {"amount": 50, "type": "income", "category": "红包", "note": "收到红包"}
+  {"amount": 10, "type": "expense", "category": "餐饮", "date": "2026-05-20T08:10:00", "note": "早餐"},
+  {"amount": 20, "type": "expense", "category": "餐饮", "date": "2026-05-20T12:20:00", "note": "午餐"},
+  {"amount": 50, "type": "income", "category": "红包", "date": "2026-05-20T19:30:00", "note": "收到红包"}
 ]
 ```
 
@@ -356,9 +362,9 @@ Content-Type: application/json
 curl -X POST http://localhost:8000/api/ledger/batch \
   -H "Content-Type: application/json" \
   -d '[
-    {"amount": 10, "type": "expense", "category": "餐饮", "note": "早餐"},
-    {"amount": 20, "type": "expense", "category": "餐饮", "note": "午餐"},
-    {"amount": 50, "type": "income", "category": "红包", "note": "收到红包"}
+    {"amount": 10, "type": "expense", "category": "餐饮", "date": "2026-05-20T08:10:00", "note": "早餐"},
+    {"amount": 20, "type": "expense", "category": "餐饮", "date": "2026-05-20T12:20:00", "note": "午餐"},
+    {"amount": 50, "type": "income", "category": "红包", "date": "2026-05-20T19:30:00", "note": "收到红包"}
   ]'
 ```
 
