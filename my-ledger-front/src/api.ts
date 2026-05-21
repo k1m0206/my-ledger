@@ -2,12 +2,13 @@ import { LedgerItem, LedgerSummary, Categories, CategoryConfig } from './types';
 import { authFetch } from './auth';
 
 export const api = {
-  getLedgers: async (params?: { start_date?: string, end_date?: string }): Promise<LedgerItem[]> => {
+  getLedgers: async (params?: { start_date?: string, end_date?: string, limit?: number }): Promise<LedgerItem[]> => {
     let url = '/api/ledger/';
     if (params) {
       const qs = new URLSearchParams();
       if (params.start_date) qs.append('start_date', params.start_date);
       if (params.end_date) qs.append('end_date', params.end_date);
+      if (params.limit) qs.append('limit', String(params.limit));
       url += `?${qs.toString()}`;
     }
     const res = await authFetch(url);

@@ -14,6 +14,7 @@
     "settings": "Settings",
     "details": "Details",
     "statistics": "Statistics",
+    "all": "All",
     "addEntry": "Add Entry",
     "yuan": "yuan",
     "total": "{{count}} entries"
@@ -25,7 +26,10 @@
     "analysisCharts": "Analysis Charts",
     "noData": "No data to analyze",
     "byMonth": "Monthly",
-    "byYear": "Yearly"
+    "byYear": "Yearly",
+    "searchPlaceholder": "Search amount, type, note, time",
+    "searchThisMonth": "This Month",
+    "searchGlobal": "Global"
   },
   "addLedger": {
     "title": "Add Entry",

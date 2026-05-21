@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Plus, Calendar, List, PieChart, Settings } from 'lucide-react';
+import { Plus, Calendar, List, PieChart, Settings, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
-import { CategoryConfig, LedgerItem, LedgerSummary } from '../types';
+import { CategoryConfig, LedgerItem, LedgerSummary, LedgerType } from '../types';
 import { Charts } from './Charts';
 import { getCategoryIcon } from '../icons';
 import { LedgerDetailView } from './LedgerDetailView';
@@ -15,6 +15,9 @@ interface HomeViewProps {
   onSettingsClick: () => void;
 }
 
+type DetailFilter = 'all' | LedgerType;
+type SearchScope = 'month' | 'global';
+
 export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -25,6 +28,10 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
   const [selectedLedger, setSelectedLedger] = useState<LedgerItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'ledger' | 'stats'>('ledger');
+  const [detailFilter, setDetailFilter] = useState<DetailFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>('month');
+  const [searchScopeOpen, setSearchScopeOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = new Date();
@@ -66,10 +73,14 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
       const detailRange = getMonthRange(currentMonth);
       const chartRange = viewMode === 'month' ? detailRange : getYearRange(currentYear);
 
+      const detailParams = searchScope === 'month'
+        ? { start_date: detailRange.startDate, end_date: detailRange.endDate, limit: 1000 }
+        : { limit: 1000 };
+
       const [lRes, sRes, chartRes] = await Promise.all([
-        api.getLedgers({ start_date: detailRange.startDate, end_date: detailRange.endDate }),
+        api.getLedgers(detailParams),
         api.getSummary({ start_date: detailRange.startDate, end_date: detailRange.endDate }),
-        api.getLedgers({ start_date: chartRange.startDate, end_date: chartRange.endDate })
+        api.getLedgers({ start_date: chartRange.startDate, end_date: chartRange.endDate, limit: 1000 })
       ]);
       setLedgers(lRes);
       setSummary(sRes);
@@ -83,7 +94,7 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
 
   useEffect(() => {
     fetchData();
-  }, [currentMonth, currentYear, viewMode]);
+  }, [currentMonth, currentYear, viewMode, searchScope]);
 
   const formatCurrency = (amount: number) =>
     amount.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' });
@@ -113,6 +124,37 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
     });
 
     return groups;
+  };
+
+  const getTypeLabel = (type: LedgerType) => type === 'income' ? t('common.income') : t('common.expense');
+
+  const matchesSearchQuery = (ledger: LedgerItem, query: string) => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) {
+      return true;
+    }
+
+    const date = formatDate(ledger.date);
+    const time = formatTime(ledger.date);
+    const sign = ledger.type === 'income' ? '+' : '-';
+    const values = [
+      String(ledger.amount),
+      ledger.amount.toFixed(2),
+      formatCurrency(ledger.amount),
+      `${sign}${ledger.amount}`,
+      `${sign}${ledger.amount.toFixed(2)}`,
+      ledger.type,
+      getTypeLabel(ledger.type),
+      ledger.category,
+      t(`categories.${ledger.category}`, ledger.category),
+      ledger.note || '',
+      date,
+      time,
+      `${date} ${time}`,
+      ledger.date
+    ];
+
+    return values.some(value => value.toLowerCase().includes(keyword));
   };
 
   const getCategoryMeta = (ledger: LedgerItem) => {
@@ -158,19 +200,95 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
   );
 
   const renderLedgerList = () => {
-    const groupedLedgers = groupLedgersByDate(ledgers);
+    const filteredLedgers = detailFilter === 'all'
+      ? ledgers
+      : ledgers.filter(item => item.type === detailFilter);
+    const searchedLedgers = filteredLedgers.filter(item => matchesSearchQuery(item, searchQuery));
+    const groupedLedgers = groupLedgersByDate(searchedLedgers);
+    const detailFilters: { value: DetailFilter; label: string }[] = [
+      { value: 'all', label: t('common.all') },
+      { value: 'expense', label: t('common.expense') },
+      { value: 'income', label: t('common.income') }
+    ];
+    const searchScopes: { value: SearchScope; label: string }[] = [
+      { value: 'month', label: t('home.searchThisMonth') },
+      { value: 'global', label: t('home.searchGlobal') }
+    ];
 
     return (
       <div className="flex-1 flex flex-col relative overflow-hidden">
-        <div className="flex justify-between items-center py-4 px-6 sticky top-0 bg-[#fdfcfb]/90 backdrop-blur z-10 border-b border-[#f0ede6]">
-          <h2 className="font-serif text-lg">{t('home.recentDetails')}</h2>
-          <span className="text-xs text-[#8b9d83] font-bold uppercase tracking-tighter">{t('common.total', { count: summary.count })}</span>
+        <div className="py-4 px-6 sticky top-0 bg-[#fdfcfb]/90 backdrop-blur z-10 border-b border-[#f0ede6]">
+          <div className="flex flex-col xl:flex-row xl:items-center gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <h2 className="font-serif text-lg whitespace-nowrap">{t('home.recentDetails')}</h2>
+              <div className="relative min-w-[220px] flex-1">
+                <div className="absolute left-1.5 top-1/2 z-20 -translate-y-1/2">
+                  <button
+                    type="button"
+                    onClick={() => setSearchScopeOpen(open => !open)}
+                    onBlur={() => window.setTimeout(() => setSearchScopeOpen(false), 100)}
+                    className="flex h-7 w-[76px] items-center justify-center gap-1 rounded-lg border border-[#f0ede6] bg-[#f9f8f5] text-xs font-semibold text-[#8b9d83] shadow-sm transition-colors hover:bg-white"
+                  >
+                    {searchScopes.find(scope => scope.value === searchScope)?.label}
+                    <ChevronDown size={12} />
+                  </button>
+                  {searchScopeOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-[76px] overflow-hidden rounded-xl border border-[#f0ede6] bg-white p-1 shadow-lg">
+                      {searchScopes.map(scope => (
+                        <button
+                          key={scope.value}
+                          type="button"
+                          className={`flex h-7 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors ${
+                            searchScope === scope.value
+                              ? 'bg-[#8b9d83] text-white'
+                              : 'text-gray-500 hover:bg-[#f9f8f5] hover:text-[#8b9d83]'
+                          }`}
+                          onMouseDown={event => event.preventDefault()}
+                          onClick={() => {
+                            setSearchScope(scope.value);
+                            setSearchScopeOpen(false);
+                          }}
+                        >
+                          {scope.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <input
+                  value={searchQuery}
+                  onChange={event => setSearchQuery(event.target.value)}
+                  placeholder={t('home.searchPlaceholder')}
+                  className="w-full h-9 rounded-xl bg-white border border-[#f0ede6] pl-[86px] pr-3 text-sm outline-none focus:border-[#8b9d83] focus:ring-2 focus:ring-[#8b9d83]/10"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 min-w-0">
+              <div className="flex h-8 bg-[#f9f8f5] p-0.5 rounded-lg">
+                {detailFilters.map(filter => (
+                  <button
+                    key={filter.value}
+                    className={`min-w-[38px] px-2 text-xs font-medium leading-none rounded-md transition-colors whitespace-nowrap flex items-center justify-center ${
+                      detailFilter === filter.value
+                        ? 'bg-white shadow-sm text-[#8b9d83]'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    onClick={() => setDetailFilter(filter.value)}
+                  >
+                    {filter.label}
+                  </button>
+              ))}
+            </div>
+              <span className="text-xs text-[#8b9d83] font-bold uppercase tracking-tighter whitespace-nowrap">{t('common.total', { count: searchedLedgers.length })}</span>
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-2 pb-6">
           {loading ? (
             <p className="text-center text-gray-400 mt-10 text-sm">{t('common.loading')}</p>
-          ) : ledgers.length === 0 ? (
+          ) : searchedLedgers.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-gray-400 mt-20">
                <Calendar size={48} className="mb-4 opacity-30 text-[#8b9d83]" />
                <p className="text-sm">{t('home.noRecords')}</p>
