@@ -248,10 +248,15 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {!loading && chartLedgers.length > 0 ? (
-          <Charts ledgers={chartLedgers} viewMode={viewMode} />
+        {!loading ? (
+          <Charts
+            ledgers={chartLedgers}
+            viewMode={viewMode}
+            currentMonth={currentMonth}
+            currentYear={currentYear}
+          />
         ) : (
-          <p className="text-center text-gray-400 mt-10 text-sm">{t('home.noData')}</p>
+          <p className="text-center text-gray-400 mt-10 text-sm">{t('common.loading')}</p>
         )}
       </div>
     </div>

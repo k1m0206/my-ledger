@@ -6,9 +6,11 @@ import { LedgerItem, LedgerType } from '../types';
 interface ChartsProps {
   ledgers: LedgerItem[];
   viewMode: 'month' | 'year';
+  currentMonth: string; // format: YYYY-MM
+  currentYear: string; // format: YYYY
 }
 
-export function Charts({ ledgers, viewMode }: ChartsProps) {
+export function Charts({ ledgers, viewMode, currentMonth, currentYear }: ChartsProps) {
   const { t } = useTranslation();
   const [activeType, setActiveType] = useState<LedgerType>('expense');
 
@@ -46,34 +48,36 @@ export function Charts({ ledgers, viewMode }: ChartsProps) {
       });
     } else {
       const valueMap = new Map<string, number>();
-      const monthsSet = new Set<string>();
 
       ledgers.filter(l => l.type === activeType).forEach(l => {
-        const dateObj = new Date(l.date);
-        const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-        monthsSet.add(monthKey);
+        const [datePart] = l.date.split('T');
+        const [year, month] = datePart.split('-');
+        const monthKey = `${year}-${month}`;
         valueMap.set(monthKey, (valueMap.get(monthKey) || 0) + l.amount);
       });
 
-      const sortedMonths = Array.from(monthsSet).sort();
-      return sortedMonths.map(month => {
-        const [, monthNum] = month.split('-');
+      return Array.from({ length: 12 }, (_, index) => {
+        const monthNum = String(index + 1).padStart(2, '0');
+        const monthKey = `${currentYear}-${monthNum}`;
+
         return {
           name: `${parseInt(monthNum)}${t('charts.monthSuffix')}`,
-          value: valueMap.get(month) || 0,
+          value: valueMap.get(monthKey) || 0,
         };
       });
     }
-  }, [ledgers, viewMode, activeType, t]);
+  }, [ledgers, viewMode, activeType, currentYear, t]);
 
   const totalAmount = categoryData.reduce((sum, item) => sum + item.value, 0);
-
-  // 计算日均和月均
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-  const avgDaily = totalAmount / daysInMonth;
-  const avgMonthly = totalAmount / (new Date().getMonth() + 1);
-
-  if (ledgers.length === 0) return null;
+  const activeLedgers = ledgers.filter(l => l.type === activeType);
+  const activeDayCount = new Set(activeLedgers.map(l => l.date.split('T')[0])).size;
+  const activeMonthCount = new Set(activeLedgers.map(l => {
+    const [datePart] = l.date.split('T');
+    const [year, month] = datePart.split('-');
+    return `${year}-${month}`;
+  })).size;
+  const avgDaily = activeDayCount > 0 ? totalAmount / activeDayCount : 0;
+  const avgMonthly = activeMonthCount > 0 ? totalAmount / activeMonthCount : 0;
 
   const typeLabel = activeType === 'expense' ? t('common.expense') : t('common.income');
 
