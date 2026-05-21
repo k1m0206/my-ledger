@@ -19,6 +19,7 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const [ledgers, setLedgers] = useState<LedgerItem[]>([]);
+  const [chartLedgers, setChartLedgers] = useState<LedgerItem[]>([]);
   const [summary, setSummary] = useState<LedgerSummary>({ total_income: 0, total_expense: 0, net_income: 0, count: 0 });
   const [categoryConfig, setCategoryConfig] = useState<CategoryConfig>({ income: [], expense: [] });
   const [selectedLedger, setSelectedLedger] = useState<LedgerItem | null>(null);
@@ -39,30 +40,40 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
     return localDate.toISOString().replace('Z', '+08:00');
   };
 
+  const getMonthRange = (monthValue: string) => {
+    const [yearStr, monthStr] = monthValue.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+
+    return {
+      startDate: toLocalISOString(new Date(year, month - 1, 1)),
+      endDate: toLocalISOString(new Date(year, month, 0, 23, 59, 59, 999))
+    };
+  };
+
+  const getYearRange = (yearValue: string) => {
+    const year = Number(yearValue);
+
+    return {
+      startDate: toLocalISOString(new Date(year, 0, 1)),
+      endDate: toLocalISOString(new Date(year, 11, 31, 23, 59, 59, 999))
+    };
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      let startDate: string;
-      let endDate: string;
+      const detailRange = getMonthRange(currentMonth);
+      const chartRange = viewMode === 'month' ? detailRange : getYearRange(currentYear);
 
-      if (viewMode === 'month') {
-        const [yearStr, monthStr] = currentMonth.split('-');
-        const year = Number(yearStr);
-        const month = Number(monthStr);
-        startDate = toLocalISOString(new Date(year, month - 1, 1));
-        endDate = toLocalISOString(new Date(year, month, 0, 23, 59, 59, 999));
-      } else {
-        const year = Number(currentYear);
-        startDate = toLocalISOString(new Date(year, 0, 1));
-        endDate = toLocalISOString(new Date(year, 11, 31, 23, 59, 59, 999));
-      }
-
-      const [lRes, sRes] = await Promise.all([
-        api.getLedgers({ start_date: startDate, end_date: endDate }),
-        api.getSummary({ start_date: startDate, end_date: endDate })
+      const [lRes, sRes, chartRes] = await Promise.all([
+        api.getLedgers({ start_date: detailRange.startDate, end_date: detailRange.endDate }),
+        api.getSummary({ start_date: detailRange.startDate, end_date: detailRange.endDate }),
+        api.getLedgers({ start_date: chartRange.startDate, end_date: chartRange.endDate })
       ]);
       setLedgers(lRes);
       setSummary(sRes);
+      setChartLedgers(chartRes);
     } catch (e) {
       console.error(e);
     } finally {
@@ -237,8 +248,8 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {!loading && ledgers.length > 0 ? (
-          <Charts ledgers={ledgers} viewMode={viewMode} />
+        {!loading && chartLedgers.length > 0 ? (
+          <Charts ledgers={chartLedgers} viewMode={viewMode} />
         ) : (
           <p className="text-center text-gray-400 mt-10 text-sm">{t('home.noData')}</p>
         )}
