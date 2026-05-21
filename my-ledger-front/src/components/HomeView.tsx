@@ -96,6 +96,12 @@ export function HomeView({ onAddClick, onSettingsClick }: HomeViewProps) {
     fetchData();
   }, [currentMonth, currentYear, viewMode, searchScope]);
 
+  useEffect(() => {
+    api.getCategoryConfig()
+      .then(setCategoryConfig)
+      .catch(() => showToast(t('addLedger.categoryLoadFailed'), 'error'));
+  }, []);
+
   const formatCurrency = (amount: number) =>
     amount.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' });
 
