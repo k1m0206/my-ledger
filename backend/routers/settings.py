@@ -1,4 +1,8 @@
+import ipaddress
+import platform
+import re
 import socket
+import subprocess
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -31,15 +35,132 @@ def build_settings_response(settings: Settings, local: bool) -> SettingsResponse
         is_local=local,
     )
 
-def get_local_ip():
+
+EXCLUDED_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("198.18.0.0/15"),
+    ipaddress.ip_network("100.64.0.0/10"),
+]
+
+VIRTUAL_ADAPTER_KEYWORDS = (
+    "bluetooth",
+    "clash",
+    "docker",
+    "hyper-v",
+    "loopback",
+    "mihomo",
+    "tap",
+    "tailscale",
+    "tun",
+    "virtual",
+    "virtualbox",
+    "vmware",
+    "wintun",
+    "wsl",
+    "zerotier",
+    "蓝牙",
+)
+
+
+def is_usable_lan_ip(ip: str) -> bool:
+    try:
+        address = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+
+    if address.version != 4:
+        return False
+    if any(address in network for network in EXCLUDED_NETWORKS):
+        return False
+    return address.is_private
+
+
+def adapter_priority(ip: str) -> int:
+    address = ipaddress.ip_address(ip)
+    if address in ipaddress.ip_network("192.168.0.0/16"):
+        return 30
+    if address in ipaddress.ip_network("10.0.0.0/8"):
+        return 20
+    if address in ipaddress.ip_network("172.16.0.0/12"):
+        return 10
+    return 0
+
+
+def get_route_local_ip() -> Optional[str]:
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
         s.close()
-        return ip
+        return ip if is_usable_lan_ip(ip) else None
     except OSError:
-        return "127.0.0.1"
+        return None
+
+
+def get_hostname_ips() -> list[str]:
+    candidates = set()
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            candidates.add(info[4][0])
+    except OSError:
+        pass
+    return [ip for ip in candidates if is_usable_lan_ip(ip)]
+
+
+def get_windows_adapter_ips() -> list[str]:
+    try:
+        result = subprocess.run(
+            ["ipconfig"],
+            capture_output=True,
+            text=True,
+            encoding="gbk",
+            errors="ignore",
+            check=False,
+        )
+    except OSError:
+        return []
+
+    candidates: list[str] = []
+    adapter_name = ""
+    skip_adapter = False
+
+    for line in result.stdout.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if not line.startswith(" ") and stripped.endswith(":"):
+            adapter_name = stripped[:-1].lower()
+            skip_adapter = any(keyword in adapter_name for keyword in VIRTUAL_ADAPTER_KEYWORDS)
+            continue
+
+        if skip_adapter:
+            continue
+
+        if "IPv4" in stripped:
+            match = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", stripped)
+            if match and is_usable_lan_ip(match.group(1)):
+                candidates.append(match.group(1))
+
+    return candidates
+
+
+def get_local_ip():
+    route_ip = get_route_local_ip()
+    candidates = []
+    if route_ip:
+        candidates.append(route_ip)
+
+    if platform.system().lower() == "windows":
+        candidates.extend(get_windows_adapter_ips())
+
+    candidates.extend(get_hostname_ips())
+    unique_candidates = list(dict.fromkeys(candidates))
+    if unique_candidates:
+        return sorted(unique_candidates, key=adapter_priority, reverse=True)[0]
+
+    return "127.0.0.1"
 
 @router.get("/", response_model=SettingsResponse, summary="获取设置")
 def get_settings(request: Request):
