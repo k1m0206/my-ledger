@@ -51,6 +51,29 @@ npm run dev
 - 后端：http://127.0.0.1:8000
 - API 文档：http://127.0.0.1:8000/docs
 
+### MCP Agent 入口
+
+如果主要给支持 MCP 的 Agent 使用，可以启动后端提供的 MCP Server。它直接复用本地数据库和账本服务，不需要先启动 HTTP 后端：
+
+```bash
+cd backend
+pip install -r requirements.txt
+python mcp_server.py
+```
+
+MCP Server 暴露以下工具：
+
+| 工具 | 功能 |
+| --- | --- |
+| `list_ledgers` | 查询账目列表，支持时间、类型、分类和分页 |
+| `search_ledgers` | 按关键词搜索金额、类型、分类、备注和日期 |
+| `get_ledger` | 按 ID 查询单个账目 |
+| `get_ledger_summary` | 统计收入、支出、结余和笔数 |
+| `get_categories` | 查询收入/支出分类 |
+| `add_ledger` | 新增账目 |
+| `update_ledger` | 修改账目 |
+| `delete_ledger` | 删除账目 |
+
 ### 一键启动
 
 Windows：

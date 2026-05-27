@@ -801,7 +801,37 @@ curl -X POST http://localhost:8000/api/ledger/batch \
 
 **工作目录：** `backend/`
 
-### 10.1 记账
+### 10.1 MCP 工具入口（优先推荐）
+
+如果当前 Agent 支持 MCP，优先使用后端提供的 MCP Server。MCP 工具返回结构化 JSON，比 CLI 文本输出更稳定。
+
+**启动方式：**
+
+```bash
+cd backend
+python mcp_server.py
+```
+
+**可用工具：**
+
+| 工具 | 用途 |
+|------|------|
+| list_ledgers | 查询账目列表，支持 start_date、end_date、type、category、skip、limit |
+| search_ledgers | 按 keyword 搜索金额、类型、分类、备注和日期 |
+| get_ledger | 按 ledger_id 查询单个账目 |
+| get_ledger_summary | 统计指定时间范围内的收入、支出、结余和笔数 |
+| get_categories | 查询收入/支出分类 |
+| add_ledger | 新增一笔账目 |
+| update_ledger | 修改一笔账目 |
+| delete_ledger | 删除指定 ID 的账目 |
+
+**调用规则：**
+- 查询明细优先用 `list_ledgers`，不确定关键词时用 `search_ledgers`。
+- 统计收入、支出、结余时用 `get_ledger_summary`。
+- 新增或修改账目前，必须确认金额、类型、分类；`date` 使用完整 ISO 8601 日期时间。
+- 删除账目前，必须确认用户明确指定了账目 ID。
+
+### 10.2 记账
 
 ```bash
 # 支出（默认）
@@ -822,7 +852,7 @@ python ledger.py add 500 兼职 --type income 外卖跑腿
 记账成功: 收入 ¥8000.0 [工资]
 ```
 
-### 10.2 查询账目
+### 10.3 查询账目
 
 ```bash
 # 查询本月账目（默认）
@@ -861,7 +891,7 @@ python ledger.py list --month 2026-05 --type expense --category 餐饮
 ------------------------------------------------------------
 ```
 
-### 10.3 统计汇总
+### 10.4 统计汇总
 
 ```bash
 # 本月统计（默认）
@@ -883,7 +913,7 @@ python ledger.py summary --year 2026
   笔数: 50
 ```
 
-### 10.4 查询分类
+### 10.5 查询分类
 
 ```bash
 # 所有分类
@@ -896,21 +926,21 @@ python ledger.py categories --type expense
 python ledger.py categories --type income
 ```
 
-### 10.5 删除记录
+### 10.6 删除记录
 
 ```bash
 python ledger.py delete <id>
 python ledger.py delete 1
 ```
 
-### 10.6 导入支付宝账单
+### 10.7 导入支付宝账单
 
 ```bash
 python import_alipay.py 支付宝交易明细.csv
 python import_alipay.py 支付宝交易明细.csv --url http://localhost:8000
 ```
 
-### 10.7 命令别名
+### 10.8 命令别名
 
 支持中英文别名：
 
