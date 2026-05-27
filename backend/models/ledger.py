@@ -1,5 +1,6 @@
+from datetime import datetime
+
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text
-from sqlalchemy.sql import func
 from database import Base
 from money import amount_to_cents, cents_to_amount
 
@@ -13,8 +14,8 @@ class Ledger(Base):
     category = Column(String(50), nullable=False)
     date = Column(DateTime, nullable=False)
     note = Column(Text, nullable=True)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     @property
     def amount(self) -> float:

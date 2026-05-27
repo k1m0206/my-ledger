@@ -18,6 +18,7 @@ def init_db():
     from models.ledger import Ledger
     Base.metadata.create_all(bind=engine)
     migrate_ledger_amount_cents()
+    migrate_ledger_timestamps()
 
 
 def migrate_ledger_amount_cents():
@@ -34,3 +35,17 @@ def migrate_ledger_amount_cents():
         if "amount" in columns:
             connection.execute(text("UPDATE ledgers SET amount_cents = CAST(ROUND(amount * 100) AS INTEGER)"))
         connection.execute(text("UPDATE ledgers SET amount_cents = 0 WHERE amount_cents IS NULL"))
+
+
+def migrate_ledger_timestamps():
+    inspector = inspect(engine)
+    if "ledgers" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("ledgers")}
+    if "created_at" not in columns or "updated_at" not in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE ledgers SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL"))
+        connection.execute(text("UPDATE ledgers SET updated_at = created_at WHERE updated_at IS NULL"))
